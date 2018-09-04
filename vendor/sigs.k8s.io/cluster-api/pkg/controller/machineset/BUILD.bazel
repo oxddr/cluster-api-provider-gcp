@@ -1,0 +1,34 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "controller.go",
+        "machine.go",
+        "status.go",
+        "zz_generated.api.register.go",
+    ],
+    importmap = "sigs.k8s.io/cluster-api-provider-gcp/vendor/sigs.k8s.io/cluster-api/pkg/controller/machineset",
+    importpath = "sigs.k8s.io/cluster-api/pkg/controller/machineset",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/kubernetes-incubator/apiserver-builder/pkg/builders:go_default_library",
+        "//vendor/github.com/kubernetes-incubator/apiserver-builder/pkg/controller:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+        "//vendor/k8s.io/client-go/rest:go_default_library",
+        "//vendor/k8s.io/client-go/tools/cache:go_default_library",
+        "//vendor/k8s.io/client-go/util/workqueue:go_default_library",
+        "//vendor/sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1:go_default_library",
+        "//vendor/sigs.k8s.io/cluster-api/pkg/client/clientset_generated/clientset:go_default_library",
+        "//vendor/sigs.k8s.io/cluster-api/pkg/client/clientset_generated/clientset/typed/cluster/v1alpha1:go_default_library",
+        "//vendor/sigs.k8s.io/cluster-api/pkg/client/listers_generated/cluster/v1alpha1:go_default_library",
+        "//vendor/sigs.k8s.io/cluster-api/pkg/controller/noderefutil:go_default_library",
+        "//vendor/sigs.k8s.io/cluster-api/pkg/controller/sharedinformers:go_default_library",
+        "//vendor/sigs.k8s.io/cluster-api/pkg/util:go_default_library",
+    ],
+)
