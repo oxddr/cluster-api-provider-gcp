@@ -10,6 +10,7 @@ go_library(
         "metadata.go",
         "pods.go",
         "serviceaccount.go",
+        "setactuator.go",
         "ssh.go",
     ],
     importpath = "sigs.k8s.io/cluster-api-provider-gcp/cloud/google",

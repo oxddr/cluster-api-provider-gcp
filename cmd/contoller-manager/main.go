@@ -25,7 +25,7 @@ func GetAllControllers(config *rest.Config) []controller.Controller {
 	si := sharedinformers.NewSharedInformers(config, shutdown)
 	return []controller.Controller{
 		machinedeployment.NewMachineDeploymentController(config, si),
-		machineset.NewMachineSetController(config, si),
+		machineset.NewMachineSetController(config, si, nil),
 	}
 }
 
