@@ -117,7 +117,7 @@ type MachineActuatorParams struct {
 }
 
 func NewMachineActuator(params MachineActuatorParams) (*GCEClient, error) {
-	computeService, err := getOrNewComputeServiceForMachine(params)
+	computeService, err := getOrNewComputeServiceForMachine(params.ComputeService)
 	if err != nil {
 		return nil, err
 	}
@@ -131,32 +131,23 @@ func NewMachineActuator(params MachineActuatorParams) (*GCEClient, error) {
 		return nil, err
 	}
 
+	sshCreds, err := getSshCreds()
+	if err != nil {
+		return nil, err
+	}
+
 	serviceAccountService := NewServiceAccountService(codec)
 
 	// Only applicable if it's running inside machine controller pod.
-	var privateKeyPath, user string
-	if _, err := os.Stat("/etc/sshkeys/private"); err == nil {
-		privateKeyPath = "/etc/sshkeys/private"
-
-		b, err := ioutil.ReadFile("/etc/sshkeys/user")
-		if err == nil {
-			user = string(b)
-		} else {
-			return nil, err
-		}
-	}
 
 	return &GCEClient{
-		certificateAuthority:   params.CertificateAuthority,
-		computeService:         computeService,
-		kubeadm:                getOrNewKubeadm(params),
-		scheme:                 scheme,
-		gceProviderConfigCodec: codec,
-		serviceAccountService:  serviceAccountService,
-		sshCreds: SshCreds{
-			privateKeyPath: privateKeyPath,
-			user:           user,
-		},
+		certificateAuthority:     params.CertificateAuthority,
+		computeService:           computeService,
+		kubeadm:                  getOrNewKubeadm(params),
+		scheme:                   scheme,
+		gceProviderConfigCodec:   codec,
+		serviceAccountService:    serviceAccountService,
+		sshCreds:                 *sshCreds,
 		v1Alpha1Client:           params.V1Alpha1Client,
 		machineSetupConfigGetter: params.MachineSetupConfigGetter,
 		eventRecorder:            params.EventRecorder,
@@ -778,9 +769,28 @@ func getOrNewKubeadm(params MachineActuatorParams) GCEClientKubeadm {
 	return params.Kubeadm
 }
 
-func getOrNewComputeServiceForMachine(params MachineActuatorParams) (GCEClientComputeService, error) {
-	if params.ComputeService != nil {
-		return params.ComputeService, nil
+func getSshCreds() (*SshCreds, error) {
+	var privateKeyPath, user string
+	if _, err := os.Stat("/etc/sshkeys/private"); err == nil {
+		privateKeyPath = "/etc/sshkeys/private"
+
+		b, err := ioutil.ReadFile("/etc/sshkeys/user")
+		if err == nil {
+			user = string(b)
+		} else {
+			return nil, err
+		}
+	}
+	return &SshCreds{
+		privateKeyPath: privateKeyPath,
+		user:           user,
+	}, nil
+
+}
+
+func getOrNewComputeServiceForMachine(computeService GCEClientComputeService) (GCEClientComputeService, error) {
+	if computeService != nil {
+		return computeService, nil
 	}
 	// The default GCP client expects the environment variable
 	// GOOGLE_APPLICATION_CREDENTIALS to point to a file with service credentials.
@@ -788,7 +798,7 @@ func getOrNewComputeServiceForMachine(params MachineActuatorParams) (GCEClientCo
 	if err != nil {
 		return nil, err
 	}
-	computeService, err := clients.NewComputeService(client)
+	computeService, err = clients.NewComputeService(client)
 	if err != nil {
 		return nil, err
 	}

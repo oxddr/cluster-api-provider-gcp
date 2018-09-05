@@ -114,6 +114,25 @@ func (c *ComputeService) FirewallsDelete(project string, name string) (*compute.
 	return c.service.Firewalls.Delete(project, name).Do()
 }
 
+func (c *ComputeService) InstanceGroupManagersGet(project, zone, igm string) (*compute.InstanceGroupManager, error) {
+	return c.service.InstanceGroupManagers.Get(project, zone, igm).Do()
+}
+func (c *ComputeService) InstanceGroupManagersInsert(project, zone string, igm *compute.InstanceGroupManager) (*compute.Operation, error) {
+	return c.service.InstanceGroupManagers.Insert(project, zone, igm).Do()
+}
+func (c *ComputeService) InstanceGroupManagersDelete(project, zone, igm string) (*compute.Operation, error) {
+	return c.service.InstanceGroupManagers.Delete(project, zone, igm).Do()
+}
+func (c *ComputeService) InstanceGroupManagersResize(project, zone, igm string, size int64) (*compute.Operation, error) {
+	return c.service.InstanceGroupManagers.Resize(project, zone, igm, size).Do()
+}
+func (c *ComputeService) InstanceGroupManagersListManagedInstances(project, zone, igm string) (*compute.InstanceGroupManagersListManagedInstancesResponse, error) {
+	return c.service.InstanceGroupManagers.ListManagedInstances(project, zone, igm).Do()
+}
+func (c *ComputeService) InstanceGroupManagersDeleteInstances(project, zone, igm string, request *compute.InstanceGroupManagersDeleteInstancesRequest) (*compute.Operation, error) {
+	return c.service.InstanceGroupManagers.DeleteInstances(project, zone, igm, request).Do()
+}
+
 func (c *ComputeService) WaitForOperation(project string, op *compute.Operation) error {
 	glog.Infof("Wait for %v %q...", op.OperationType, op.Name)
 	defer glog.Infof("Finish wait for %v %q...", op.OperationType, op.Name)

@@ -32,4 +32,9 @@ type GCEClientComputeService interface {
 	FirewallsInsert(project string, firewallRule *compute.Firewall) (*compute.Operation, error)
 	FirewallsDelete(project string, name string) (*compute.Operation, error)
 	WaitForOperation(project string, op *compute.Operation) error
+	InstanceGroupManagersGet(project, zone, igm string) (*compute.InstanceGroupManager, error)
+	InstanceGroupManagersInsert(project, zone string, igm *compute.InstanceGroupManager) (*compute.Operation, error)
+	InstanceGroupManagersDelete(project, zone, igm string) (*compute.Operation, error)
+	InstanceGroupManagersResize(project, zone, igm string, size int64) (*compute.Operation, error)
+	InstanceGroupManagersListManagedInstances(project, zone, igm string) (*compute.InstanceGroupManagersListManagedInstancesResponse, error)
 }

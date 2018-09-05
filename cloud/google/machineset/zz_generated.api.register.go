@@ -12,11 +12,11 @@ import (
 )
 
 type SetActuator interface {
-	GroupExists(*clusterv1.MachineSet) (bool, error)
-	CreateGroup(*clusterv1.MachineSet) error
-	DeleteGroup(*clusterv1.MachineSet) error
-	ResizeGroup(*clusterv1.MachineSet) error
-	ListMachines(*clusterv1.MachineSet) ([]string, error)
+	GroupExists(*clusterv1.Cluster, *clusterv1.MachineSet) (bool, error)
+	CreateGroup(*clusterv1.Cluster, *clusterv1.MachineSet) error
+	DeleteGroup(*clusterv1.Cluster, *clusterv1.MachineSet) error
+	ResizeGroup(*clusterv1.Cluster, *clusterv1.MachineSet) error
+	ListMachines(*clusterv1.Cluster, *clusterv1.MachineSet) ([]string, error)
 }
 
 // MachineSetController implements the controller.MachineSetController interface

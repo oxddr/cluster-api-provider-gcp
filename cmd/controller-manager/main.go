@@ -9,6 +9,7 @@ import (
 
 	"k8s.io/apiserver/pkg/util/logs"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/cluster-api-provider-gcp/cloud/google"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/google/machineset"
 
 	"sigs.k8s.io/cluster-api/pkg/controller/config"
@@ -20,13 +21,17 @@ func init() {
 	config.ControllerConfig.AddFlags(pflag.CommandLine)
 }
 
-func GetAllControllers(config *rest.Config) []controller.Controller {
+func GetAllControllers(config *rest.Config) ([]controller.Controller, error) {
 	shutdown := make(chan struct{})
 	si := sharedinformers.NewSharedInformers(config, shutdown)
+	actuator, err := google.NewMachineSetActuator(google.MachineSetActuatorParams{})
+	if err != nil {
+		return nil, err
+	}
 	return []controller.Controller{
 		machinedeployment.NewMachineDeploymentController(config, si),
-		machineset.NewMachineSetController(config, si, nil),
-	}
+		machineset.NewMachineSetController(config, si, actuator),
+	}, nil
 }
 
 func main() {
@@ -46,7 +51,10 @@ func main() {
 		glog.Fatalf("Could not create Config for talking to the apiserver: %v", err)
 	}
 
-	controllers := GetAllControllers(config)
+	controllers, err := GetAllControllers(config)
+	if err != nil {
+		glog.Fatalf("Could not create controllers: %v", err)
+	}
 	controller.StartControllerManager(controllers...)
 
 	// Blockforever

@@ -3,6 +3,7 @@
 package machineset
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -52,11 +53,18 @@ func (c *MachineSetControllerImpl) Init(arguments sharedinformers.ControllerInit
 // note that the current state of the cluster is calculated based on the number of machines
 // that are owned by the given machineSet (key).
 func (c *MachineSetControllerImpl) Reconcile(machineSet *clusterv1.MachineSet) error {
+	2
 	glog.Infof("Running reconcile MachineSet for %s", machineSet.Name)
-	if !machineSet.DeletionTimestamp.IsZero() {
-		return c.delete(machineSet)
+
+	cluster, err := c.getCluster(machineSet)
+	if err != nil {
+		return err
 	}
-	var err error
+
+	if !machineSet.DeletionTimestamp.IsZero() {
+		return c.delete(cluster, machineSet)
+	}
+
 	if !util.Contains(machineSet.Finalizers, MachineSetFinalizer) {
 		machineSet.Finalizers = append(machineSet.Finalizers, MachineSetFinalizer)
 		machineSet, err = c.clientSet.ClusterV1alpha1().MachineSets(machineSet.Namespace).Update(machineSet)
@@ -69,14 +77,15 @@ func (c *MachineSetControllerImpl) Reconcile(machineSet *clusterv1.MachineSet) e
 	if err != nil {
 		return err
 	}
-	return c.syncReplicas(machineSet, filteredMachines)
+	return c.syncReplicas(cluster, machineSet, filteredMachines)
 }
+
 func (c *MachineSetControllerImpl) Get(namespace, name string) (*clusterv1.MachineSet, error) {
 	return c.machineSetsLister.MachineSets(namespace).Get(name)
 }
 
 // syncReplicas essentially scales machine resources up and down.
-func (c *MachineSetControllerImpl) syncReplicas(machineSet *clusterv1.MachineSet, machines []*clusterv1.Machine) error {
+func (c *MachineSetControllerImpl) syncReplicas(cluster *clusterv1.Cluster, machineSet *clusterv1.MachineSet, machines []*clusterv1.Machine) error {
 	// Take ownership of machines if not already owned.
 	for _, machine := range machines {
 		if shouldAdopt(machineSet, machine) {
@@ -86,7 +95,7 @@ func (c *MachineSetControllerImpl) syncReplicas(machineSet *clusterv1.MachineSet
 	start := time.Now()
 	verb := "Resizing"
 	var size string
-	exist, err := c.actuator.GroupExists(machineSet)
+	exist, err := c.actuator.GroupExists(cluster, machineSet)
 	if err != nil {
 		glog.Errorf("Error checking existence of IGM for machine set [%v]: %v", machineSet.Name, err)
 		// TODO(janluk): Ignore this error for now
@@ -94,24 +103,24 @@ func (c *MachineSetControllerImpl) syncReplicas(machineSet *clusterv1.MachineSet
 	}
 	if !exist {
 		glog.Infof("IGM for machine set [%v] does not exist. Creating one.", machineSet.Name)
-		if err := c.actuator.CreateGroup(machineSet); err != nil {
+		if err := c.actuator.CreateGroup(cluster, machineSet); err != nil {
 			glog.Errorf("Failed to create IGM: %v", err)
 		}
 		verb = "Creating"
 		size = fmt.Sprintf("size = %d", *machineSet.Spec.Replicas)
 	}
-	vms, err := c.actuator.ListMachines(machineSet)
+	vms, err := c.actuator.ListMachines(cluster, machineSet)
 	if err != nil {
 		glog.Errorf("Error listing machines for machine set %v", machineSet.Name)
 		return err
 	}
 	diff := *machineSet.Spec.Replicas - int32(len(vms))
 	if diff != 0 {
-		if err := c.actuator.ResizeGroup(machineSet); err != nil {
+		if err := c.actuator.ResizeGroup(cluster, machineSet); err != nil {
 			glog.Errorf("Error resizing machine set %v", machineSet.Name)
 			return nil
 		}
-		vms, err = c.actuator.ListMachines(machineSet)
+		vms, err = c.actuator.ListMachines(cluster, machineSet)
 		if err != nil {
 			glog.Errorf("Error listing machines for machine set %v after resize", machineSet.Name)
 			return err
@@ -164,6 +173,7 @@ func (c *MachineSetControllerImpl) createMachine(machineSet *clusterv1.MachineSe
 	machine.ObjectMeta.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(machineSet, controllerKind)}
 	return c.clientSet.ClusterV1alpha1().Machines(machineSet.Namespace).Create(machine)
 }
+
 func (c *MachineSetControllerImpl) deleteMachine(machineSet *clusterv1.MachineSet, machine *clusterv1.Machine) error {
 	machine.ObjectMeta.Finalizers = util.Filter(machine.ObjectMeta.Finalizers, clusterv1.MachineFinalizer)
 	machine, err := c.clientSet.ClusterV1alpha1().Machines(machineSet.Namespace).Update(machine)
@@ -186,6 +196,7 @@ func (c *MachineSetControllerImpl) getMachines(machineSet *clusterv1.MachineSet)
 	}
 	return filteredMachines, err
 }
+
 func shouldAdopt(machineSet *clusterv1.MachineSet, machine *clusterv1.Machine) bool {
 	// Do nothing if the machine is being deleted.
 	if !machine.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -203,6 +214,7 @@ func shouldAdopt(machineSet *clusterv1.MachineSet, machine *clusterv1.Machine) b
 	}
 	return true
 }
+
 func (c *MachineSetControllerImpl) adoptOrphan(machineSet *clusterv1.MachineSet, machine *clusterv1.Machine) {
 	// Add controller reference.
 	ownerRefs := machine.ObjectMeta.GetOwnerReferences()
@@ -216,13 +228,14 @@ func (c *MachineSetControllerImpl) adoptOrphan(machineSet *clusterv1.MachineSet,
 		glog.Warningf("Failed to update machine owner reference. %v", err)
 	}
 }
-func (c *MachineSetControllerImpl) delete(machineSet *clusterv1.MachineSet) error {
+
+func (c *MachineSetControllerImpl) delete(cluster *clusterv1.Cluster, machineSet *clusterv1.MachineSet) error {
 	if !util.Contains(machineSet.Finalizers, MachineSetFinalizer) {
 		glog.Infof("Reconciling machines set object %v causes a no-op as there is no finalizer.", machineSet.Name)
 		return nil
 	}
 	glog.Infof("Reconciling machine set object %v triggers delete.", machineSet.Name)
-	if err := c.actuator.DeleteGroup(machineSet); err != nil {
+	if err := c.actuator.DeleteGroup(cluster, machineSet); err != nil {
 		glog.Errorf("Error deleting IGM %v: %v", machineSet.Name, err)
 		return err
 	}
@@ -234,6 +247,7 @@ func (c *MachineSetControllerImpl) delete(machineSet *clusterv1.MachineSet) erro
 	}
 	return nil
 }
+
 func (c *MachineSetControllerImpl) updateStatus(machineSet *clusterv1.MachineSet) (*clusterv1.MachineSet, error) {
 	ms, err := c.clientSet.ClusterV1alpha1().MachineSets(machineSet.Namespace).UpdateStatus(machineSet)
 	if err != nil {
@@ -241,4 +255,20 @@ func (c *MachineSetControllerImpl) updateStatus(machineSet *clusterv1.MachineSet
 		return nil, err
 	}
 	return ms, nil
+}
+
+func (c *MachineSetControllerImpl) getCluster(machineSet *clusterv1.MachineSet) (*clusterv1.Cluster, error) {
+	clusterList, err := c.clientSet.ClusterV1alpha1().Clusters(machineSet.Namespace).List(metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	switch len(clusterList.Items) {
+	case 0:
+		return nil, errors.New("no clusters defined")
+	case 1:
+		return &clusterList.Items[0], nil
+	default:
+		return nil, errors.New("multiple clusters defined")
+	}
 }
