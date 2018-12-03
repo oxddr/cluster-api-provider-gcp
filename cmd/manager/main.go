@@ -28,7 +28,8 @@ import (
 	"sigs.k8s.io/cluster-api-provider-gcp/pkg/controller"
 	clusterapis "sigs.k8s.io/cluster-api/pkg/apis"
 	clustercommon "sigs.k8s.io/cluster-api/pkg/apis/cluster/common"
-	clustercontroller "sigs.k8s.io/cluster-api/pkg/controller"
+	"sigs.k8s.io/cluster-api/pkg/controller/machinedeployment"
+	"sigs.k8s.io/cluster-api/pkg/controller/node"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
@@ -73,8 +74,13 @@ func main() {
 	if err := controller.AddToManager(mgr); err != nil {
 		log.Fatal(err)
 	}
-	if err := clustercontroller.AddToManager(mgr); err != nil {
-		log.Fatal(err)
+
+	// AddToManagerFuncs is a list of functions to add all Controllers to the Manager
+	addToManagerFuncs := []func(manager.Manager) error{node.Add, machinedeployment.Add}
+	for _, f := range addToManagerFuncs {
+		if err := f(mgr); err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	log.Printf("Starting the Cmd.")
