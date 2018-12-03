@@ -98,6 +98,7 @@ type GCEClient struct {
 	machineSetupConfigGetter GCEClientMachineSetupConfigGetter
 	eventRecorder            record.EventRecorder
 	scheme                   *runtime.Scheme
+	ignoreMigMachines        bool
 }
 
 type MachineActuatorParams struct {
@@ -109,6 +110,7 @@ type MachineActuatorParams struct {
 	EventRecorder            record.EventRecorder
 	Scheme                   *runtime.Scheme
 	CloudConfigPath          string
+	IgnoreMigMachines        bool
 }
 
 func NewMachineActuator(params MachineActuatorParams) (*GCEClient, error) {
@@ -144,6 +146,7 @@ func NewMachineActuator(params MachineActuatorParams) (*GCEClient, error) {
 		machineSetupConfigGetter: params.MachineSetupConfigGetter,
 		eventRecorder:            params.EventRecorder,
 		scheme:                   params.Scheme,
+		ignoreMigMachines:        params.IgnoreMigMachines,
 	}, nil
 }
 
@@ -253,6 +256,15 @@ func (gce *GCEClient) Create(cluster *clusterv1.Cluster, machine *clusterv1.Mach
 
 	if verr := gce.validateMachine(machine, machineConfig); verr != nil {
 		return gce.handleMachineError(machine, verr, createEventAction)
+	}
+
+	if gce.ignoreMigMachines {
+		glog.Info("ignoreMigmachines = true")
+		owner := metav1.GetControllerOf(machine)
+		if owner != nil {
+			glog.Infof("Machine %v is controlled by %v causes a no-op", machine.Name, owner.Name)
+			return nil
+		}
 	}
 
 	configParams := &machinesetup.ConfigParams{

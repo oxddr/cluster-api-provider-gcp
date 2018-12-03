@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/cluster-api-provider-gcp/pkg/controller"
 	clusterapis "sigs.k8s.io/cluster-api/pkg/apis"
 	clustercommon "sigs.k8s.io/cluster-api/pkg/apis/cluster/common"
+	clustercontroller "sigs.k8s.io/cluster-api/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
@@ -36,6 +37,7 @@ import (
 var (
 	cloudConfig        = flag.String("cloud-config", "", "path to the GCE config")
 	machineSetupConfig = flag.String("machine-setup-config", "/etc/machinesetup/machine_setup_configs.yaml", "path to the machine setup config")
+	ignoreMigMachines  = flag.Bool("ignore-mig-machines", true, "whether to ignore machines created by MIG for Machines creation purposes")
 )
 
 func main() {
@@ -71,6 +73,9 @@ func main() {
 	if err := controller.AddToManager(mgr); err != nil {
 		log.Fatal(err)
 	}
+	if err := clustercontroller.AddToManager(mgr); err != nil {
+		log.Fatal(err)
+	}
 
 	log.Printf("Starting the Cmd.")
 
@@ -91,6 +96,7 @@ func initStaticDeps(mgr manager.Manager) {
 		Client:                   mgr.GetClient(),
 		Scheme:                   mgr.GetScheme(),
 		CloudConfigPath:          *cloudConfig,
+		IgnoreMigMachines:        *ignoreMigMachines,
 	})
 	if err != nil {
 		glog.Fatalf("Error creating cluster provisioner for google : %v", err)
