@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/cluster-api-provider-gcp/pkg/cloud/google"
 	"sigs.k8s.io/cluster-api-provider-gcp/pkg/cloud/google/machinesetup"
 	"sigs.k8s.io/cluster-api-provider-gcp/pkg/controller"
+	"sigs.k8s.io/cluster-api-provider-gcp/pkg/controller/machineset"
 	clusterapis "sigs.k8s.io/cluster-api/pkg/apis"
 	clustercommon "sigs.k8s.io/cluster-api/pkg/apis/cluster/common"
 	"sigs.k8s.io/cluster-api/pkg/controller/machinedeployment"
@@ -76,7 +77,10 @@ func main() {
 	}
 
 	// AddToManagerFuncs is a list of functions to add all Controllers to the Manager
-	addToManagerFuncs := []func(manager.Manager) error{node.Add, machinedeployment.Add}
+	addToManagerFuncs := []func(manager.Manager) error{
+		node.Add,
+		machineset.Add,
+		machinedeployment.Add}
 	for _, f := range addToManagerFuncs {
 		if err := f(mgr); err != nil {
 			log.Fatal(err)
