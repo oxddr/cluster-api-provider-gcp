@@ -23,13 +23,22 @@ import (
 type GCEClientComputeService interface {
 	ImagesGet(project string, image string) (*compute.Image, error)
 	ImagesGetFromFamily(project string, family string) (*compute.Image, error)
+
 	InstancesDelete(project string, zone string, targetInstance string) (*compute.Operation, error)
 	InstancesGet(project string, zone string, instance string) (*compute.Instance, error)
 	InstancesInsert(project string, zone string, instance *compute.Instance) (*compute.Operation, error)
+
 	ZoneOperationsGet(project string, zone string, operation string) (*compute.Operation, error)
 	GlobalOperationsGet(project string, operation string) (*compute.Operation, error)
+	WaitForOperation(project string, op *compute.Operation) error
+
 	FirewallsGet(project string) (*compute.FirewallList, error)
 	FirewallsInsert(project string, firewallRule *compute.Firewall) (*compute.Operation, error)
 	FirewallsDelete(project string, name string) (*compute.Operation, error)
-	WaitForOperation(project string, op *compute.Operation) error
+
+	InstanceGroupManagersGet(project, zone, igm string) (*compute.InstanceGroupManager, error)
+	InstanceGroupManagersInsert(project, zone string, igm *compute.InstanceGroupManager) (*compute.Operation, error)
+	InstanceGroupManagersDelete(project, zone, igm string) (*compute.Operation, error)
+	InstanceGroupManagersResize(project, zone, igm string, size int64) (*compute.Operation, error)
+	InstanceGroupManagersListInstances(project, zone, igm string) (*compute.InstanceGroupManagersListManagedInstancesResponse, error)
 }

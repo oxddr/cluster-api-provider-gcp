@@ -108,3 +108,23 @@ func (c *GCEClientComputeServiceMock) WaitForOperation(project string, op *compu
 	}
 	return c.mockWaitForOperation(project, op)
 }
+
+func (c *GCEClientComputeServiceMock) InstanceGroupManagersGet(project, zone, igm string) (*compute.InstanceGroupManager, error) {
+	panic("not implemented")
+}
+
+func (c *GCEClientComputeServiceMock) InstanceGroupManagersInsert(project, zone string, igm *compute.InstanceGroupManager) (*compute.Operation, error) {
+	panic("not implemented")
+}
+
+func (c *GCEClientComputeServiceMock) InstanceGroupManagersDelete(project, zone, igm string) (*compute.Operation, error) {
+	panic("not implemented")
+}
+
+func (c *GCEClientComputeServiceMock) InstanceGroupManagersResize(project, zone, igm string, size int64) (*compute.Operation, error) {
+	panic("not implemented")
+}
+
+func (c *GCEClientComputeServiceMock) InstanceGroupManagersListInstances(project, zone, igm string) (*compute.InstanceGroupManagersListManagedInstancesResponse, error) {
+	panic("not implemented")
+}

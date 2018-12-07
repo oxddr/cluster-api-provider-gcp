@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	clusterv1alpha1 "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"y
+	clusterv1alpha1 "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
 	"sigs.k8s.io/cluster-api/pkg/util"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -48,14 +48,18 @@ var stateConfirmationInterval = 100 * time.Millisecond
 
 // Add creates a new MachineSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager) error {
-	r := newReconciler(mgr)
+func AddWithActuator(mgr manager.Manager, actuator Actuator) error {
+	r := newReconciler(mgr, actuator)
 	return add(mgr, r, r.MachineSetToMachines)
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) *ReconcileMachineSet {
-	return &ReconcileMachineSet{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+func newReconciler(mgr manager.Manager, actuator Actuator) *ReconcileMachineSet {
+	return &ReconcileMachineSet{
+		Client:   mgr.GetClient(),
+		scheme:   mgr.GetScheme(),
+		actuator: actuator,
+	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -98,6 +102,8 @@ var _ reconcile.Reconciler = &ReconcileMachineSet{}
 type ReconcileMachineSet struct {
 	client.Client
 	scheme *runtime.Scheme
+
+	actuator Actuator
 }
 
 func (r *ReconcileMachineSet) MachineSetToMachines(o handler.MapObject) []reconcile.Request {
@@ -166,10 +172,12 @@ func (r *ReconcileMachineSet) Reconcile(request reconcile.Request) (reconcile.Re
 		}
 		// Attempt to adopt machine if it meets previous conditions and it has no controller ref.
 		if metav1.GetControllerOf(machine) == nil {
-			if err := r.adoptOrphan(machineSet, machine); err != nil {
-				glog.Warningf("failed to adopt machine %v into machineset %v. %v", machine.Name, machineSet.Name, err)
-				continue
-			}
+			// TODO(janluk): kill orphans?
+			continue
+			// if err := r.adoptOrphan(machineSet, machine); err != nil {
+			// 	glog.Warningf("failed to adopt machine %v into machineset %v. %v", machine.Name, machineSet.Name, err)
+			// 	continue
+			// }
 		}
 		filteredMachines = append(filteredMachines, machine)
 	}

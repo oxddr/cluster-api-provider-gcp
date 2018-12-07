@@ -114,7 +114,7 @@ type MachineActuatorParams struct {
 }
 
 func NewMachineActuator(params MachineActuatorParams) (*GCEClient, error) {
-	computeService, err := getOrNewComputeServiceForMachine(params)
+	computeService, err := getOrNewComputeServiceForMachine(params.ComputeService, params.CloudConfigPath)
 	if err != nil {
 		return nil, err
 	}
@@ -259,7 +259,6 @@ func (gce *GCEClient) Create(cluster *clusterv1.Cluster, machine *clusterv1.Mach
 	}
 
 	if gce.ignoreMigMachines {
-		glog.Info("ignoreMigmachines = true")
 		owner := metav1.GetControllerOf(machine)
 		if owner != nil {
 			glog.Infof("Machine %v is controlled by %v causes a no-op", machine.Name, owner.Name)
@@ -807,17 +806,17 @@ func getOrNewKubeadm(params MachineActuatorParams) GCEClientKubeadm {
 	return params.Kubeadm
 }
 
-func getOrNewComputeServiceForMachine(params MachineActuatorParams) (GCEClientComputeService, error) {
-	if params.ComputeService != nil {
-		return params.ComputeService, nil
+func getOrNewComputeServiceForMachine(computeService GCEClientComputeService, cloudConfigPath string) (GCEClientComputeService, error) {
+	if computeService != nil {
+		return computeService, nil
 	}
 
 	var client *http.Client
 	var err error
 	// If specified in the GCE config, use the alternative authentication.
-	if params.CloudConfigPath != "" {
+	if cloudConfigPath != "" {
 		glog.Info("Trying to get open the GCE config")
-		client, err = clientWithAltTokenSource(params.CloudConfigPath)
+		client, err = clientWithAltTokenSource(cloudConfigPath)
 		if err != nil {
 			glog.Fatalf("Error creating an alternative auth client: %q", err)
 		}
@@ -831,7 +830,7 @@ func getOrNewComputeServiceForMachine(params MachineActuatorParams) (GCEClientCo
 		}
 	}
 
-	computeService, err := clients.NewComputeService(client)
+	computeService, err = clients.NewComputeService(client)
 	if err != nil {
 		return nil, err
 	}

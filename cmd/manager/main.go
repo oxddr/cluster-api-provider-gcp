@@ -26,7 +26,6 @@ import (
 	"sigs.k8s.io/cluster-api-provider-gcp/pkg/cloud/google"
 	"sigs.k8s.io/cluster-api-provider-gcp/pkg/cloud/google/machinesetup"
 	"sigs.k8s.io/cluster-api-provider-gcp/pkg/controller"
-	"sigs.k8s.io/cluster-api-provider-gcp/pkg/controller/machineset"
 	clusterapis "sigs.k8s.io/cluster-api/pkg/apis"
 	clustercommon "sigs.k8s.io/cluster-api/pkg/apis/cluster/common"
 	"sigs.k8s.io/cluster-api/pkg/controller/machinedeployment"
@@ -72,14 +71,13 @@ func main() {
 	}
 
 	// Setup all Controllers
-	if err := controller.AddToManager(mgr); err != nil {
+	if err := controller.AddToManagerWithMachineSet(mgr); err != nil {
 		log.Fatal(err)
 	}
 
 	// AddToManagerFuncs is a list of functions to add all Controllers to the Manager
 	addToManagerFuncs := []func(manager.Manager) error{
 		node.Add,
-		machineset.Add,
 		machinedeployment.Add}
 	for _, f := range addToManagerFuncs {
 		if err := f(mgr); err != nil {
@@ -108,6 +106,13 @@ func initStaticDeps(mgr manager.Manager) {
 		CloudConfigPath:          *cloudConfig,
 		IgnoreMigMachines:        *ignoreMigMachines,
 	})
+	if err == nil {
+		google.MachineSetActuator, err = google.NewMachineSetActuator(google.MachineSetActuatorParams{
+			EventRecorder:   mgr.GetRecorder("gce-controller"),
+			Client:          mgr.GetClient(),
+			CloudConfigPath: *cloudConfig,
+		})
+	}
 	if err != nil {
 		glog.Fatalf("Error creating cluster provisioner for google : %v", err)
 	}

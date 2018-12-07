@@ -5,9 +5,9 @@ import (
 )
 
 type Actuator interface {
-	GroupExists(*clusterv1.MachineSet) (bool, error)
-	CreateGroup(*clusterv1.MachineSet) error
-	DeleteGroup(*clusterv1.MachineSet) error
-	ResizeGroup(*clusterv1.MachineSet) error
-	ListMachines(*clusterv1.MachineSet) ([]string, error)
+	Create(*clusterv1.Cluster, *clusterv1.MachineSet) error
+	Delete(*clusterv1.Cluster, *clusterv1.MachineSet) error
+	Resize(*clusterv1.Cluster, *clusterv1.MachineSet) error
+
+	ListMachines(*clusterv1.Cluster, *clusterv1.MachineSet) ([]string, error)
 }
