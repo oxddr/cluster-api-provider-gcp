@@ -5,9 +5,7 @@ import (
 )
 
 type Actuator interface {
-	Create(*clusterv1.Cluster, *clusterv1.MachineSet) error
 	Delete(*clusterv1.Cluster, *clusterv1.MachineSet) error
 	Resize(*clusterv1.Cluster, *clusterv1.MachineSet) error
-
 	ListMachines(*clusterv1.Cluster, *clusterv1.MachineSet) ([]string, error)
 }

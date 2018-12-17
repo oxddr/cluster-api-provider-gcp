@@ -83,13 +83,13 @@ func (gce *GCEMachineSetClient) igmIfExists(cluster *clusterv1.Cluster, machineS
 	return igm, nil
 }
 
-func (gce *GCEMachineSetClient) Create(cluster *clusterv1.Cluster, machineSet *clusterv1.MachineSet) error {
+func (gce *GCEMachineSetClient) create(cluster *clusterv1.Cluster, machineSet *clusterv1.MachineSet) error {
 	igm, err := gce.igmIfExists(cluster, machineSet)
 	if err != nil {
 		return err
 	}
 
-	if igm == nil {
+	if igm != nil {
 		glog.Infof("Skipped creating IGM [%v] that already exists", machineSet.ObjectMeta.Name)
 		return nil
 	}
@@ -127,7 +127,8 @@ func (gce *GCEMachineSetClient) Create(cluster *clusterv1.Cluster, machineSet *c
 }
 
 func (gce *GCEMachineSetClient) getOrCreateInstanceTemplate(machineConfig *gceconfigv1.GCEMachineProviderConfig) (string, error) {
-	return "hardcoded-template", nil
+	// TODO(janluk): either use InstanceTemplate stored in MachineConfig or create one
+	return "clusterapi-machine-v03", nil
 }
 
 func (gce *GCEMachineSetClient) handleMachineSetError(machineSet *clusterv1.MachineSet, err error) error {
@@ -178,13 +179,19 @@ func (gce *GCEMachineSetClient) Delete(cluster *clusterv1.Cluster, machineSet *c
 }
 
 func (gce *GCEMachineSetClient) Resize(cluster *clusterv1.Cluster, machineSet *clusterv1.MachineSet) error {
+	// TODO(janluk): refactor create & exists block
+	err := gce.create(cluster, machineSet)
+	if err != nil {
+		return nil
+	}
+
 	igm, err := gce.igmIfExists(cluster, machineSet)
 	if err != nil {
 		return err
 	}
 
 	if igm == nil {
-		glog.Infof("Skipped deleting IGM [%v] that is already deleted", machineSet.ObjectMeta.Name)
+		glog.Infof("IGM [%v] not found. Skipping resize.", machineSet.ObjectMeta.Name)
 		return nil
 	}
 
@@ -199,6 +206,13 @@ func (gce *GCEMachineSetClient) Resize(cluster *clusterv1.Cluster, machineSet *c
 		// TODO(janluk): proper error handling
 		return gce.handleMachineSetError(machineSet, err)
 	}
+
+	newSize := int64(*machineSet.Spec.Replicas)
+	if newSize == igm.TargetSize {
+		glog.Infof("Target IGM [%v] has expected size of %d", igm.Name, igm.TargetSize)
+		return nil
+	}
+	glog.Infof("Target IGM [%v] size differs from expected [expected = %d, actual = %d]. Resizing...", igm.Name, newSize, igm.TargetSize)
 
 	op, err := gce.computeService.InstanceGroupManagersResize(clusterConfig.Project, machineConfig.Zone, machineSet.Name, int64(*machineSet.Spec.Replicas))
 	if err == nil {
