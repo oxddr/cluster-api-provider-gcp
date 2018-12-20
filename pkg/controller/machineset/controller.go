@@ -38,6 +38,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
+const MachineSetFinalizer = "machineset.cluster.k8s.io"
+
 var controllerKind = clusterv1alpha1.SchemeGroupVersion.WithKind("MachineSet")
 
 // stateConfirmationTimeout is the amount of time allowed to wait for desired state.
@@ -158,9 +160,44 @@ func (r *ReconcileMachineSet) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	glog.V(4).Infof("Reconcile machineset %v", machineSet.Name)
-	allMachines := &clusterv1alpha1.MachineList{}
+	name := machineSet.Name
+	glog.V(4).Infof("Reconcile machineset %v", name)
 
+	// If object hasn't been deleted and doesn't have a finalizer, add one
+	// Add a finalizer to newly created objects.
+	if machineSet.ObjectMeta.DeletionTimestamp.IsZero() &&
+		!util.Contains(machineSet.ObjectMeta.Finalizers, MachineSetFinalizer) {
+		machineSet.Finalizers = append(machineSet.Finalizers, MachineSetFinalizer)
+		if err = r.Client.Update(ctx, machineSet); err != nil {
+			glog.Infof("failed to add finalizer to MachineSet object %v due to error %v.", name, err)
+			return reconcile.Result{}, err
+		}
+	}
+
+	if !machineSet.ObjectMeta.DeletionTimestamp.IsZero() {
+		// no-op if finalizer has been removed.
+		if !util.Contains(machineSet.ObjectMeta.Finalizers, MachineSetFinalizer) {
+			glog.Infof("reconciling MachineSet object %v causes a no-op as there is no finalizer.", name)
+			return reconcile.Result{}, nil
+		}
+
+		glog.Infof("reconciling MachineSet object %v triggers delete.", name)
+		if err := r.delete(ctx, machineSet); err != nil {
+			glog.Errorf("Error deleting MachineSet object %v; %v", name, err)
+			return reconcile.Result{}, err
+		}
+
+		// Remove finalizer on successful deletion.
+		glog.Infof("MachineSet object %v deletion successful, removing finalizer.", name)
+		machineSet.ObjectMeta.Finalizers = util.Filter(machineSet.ObjectMeta.Finalizers, MachineSetFinalizer)
+		if err := r.Client.Update(context.Background(), machineSet); err != nil {
+			glog.Errorf("Error removing finalizer from MachineSet object %v; %v", name, err)
+			return reconcile.Result{}, err
+		}
+		return reconcile.Result{}, nil
+	}
+
+	allMachines := &clusterv1alpha1.MachineList{}
 	err = r.Client.List(context.Background(), client.InNamespace(machineSet.Namespace), allMachines)
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to list machines, %v", err)
@@ -373,10 +410,10 @@ func (c *ReconcileMachineSet) waitForMachineCreation(machineList []*clusterv1alp
 			err := c.Client.Get(context.Background(),
 				client.ObjectKey{Namespace: machine.Namespace, Name: machine.Name},
 				&clusterv1alpha1.Machine{})
-			glog.Error(err)
 			if err == nil {
 				return true, nil
 			}
+			glog.Error(err)
 			if apierrors.IsNotFound(err) {
 				return false, nil
 			}
@@ -425,4 +462,13 @@ func (c *ReconcileMachineSet) getCluster(ctx context.Context, ms *clusterv1alpha
 	default:
 		return nil, errors.New("multiple clusters defined")
 	}
+}
+
+func (c *ReconcileMachineSet) delete(ctx context.Context, ms *clusterv1alpha1.MachineSet) error {
+	cluster, err := c.getCluster(ctx, ms)
+	if err != nil {
+		return err
+	}
+
+	return c.actuator.Delete(cluster, ms)
 }

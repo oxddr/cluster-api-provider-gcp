@@ -7,5 +7,5 @@ spec:
   template:
     spec:
       containers:
-      - image: gcr.io/janluk-clusterapi/gcp-cluster-api-controller
+      - image: gcr.io/janluk-clusterapi/gcp-cluster-api-controller:latest
         name: manager
